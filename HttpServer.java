@@ -40,6 +40,7 @@ public class HttpServer {
                 
                 int contentLength = 0;
                 byte[] contentBytes;
+                String contentType;
                 switch (request.method) {
                     case HttpMethod.GET:
                         String virtualHostPath = virtualHosts.get(request.headers.get("Host"));
@@ -57,7 +58,11 @@ public class HttpServer {
                             }
                         }
 
-                        String path = System.getProperty("user.dir") + virtualHostPath + (request.path.equals("/") ? "/index.html" : request.path);
+                        String path = System.getProperty("user.dir") + virtualHostPath + request.path;
+                        if (path.endsWith("/")) {
+                            path += "index.html";
+                        }
+
                         file = new File(path);
                         if (!file.exists()) {
                             System.out.println("[ERROR] File not found: " + path);
@@ -67,6 +72,15 @@ public class HttpServer {
                         FileInputStream fileIn = new FileInputStream(file);
                         byte[] contentBytes = new byte[contentLength];
                         fileIn.read(contentBytes);
+
+                        if (request.path.endsWith(".jpg"))
+                            outToClient.writeBytes("Content-Type: image/jpeg\r\n");
+                        else if (request.path.endsWith(".gif"))
+                            outToClient.writeBytes("Content-Type: image/gif\r\n");
+                        else if (request.path.endsWith(".html") || request.path.endsWith(".htm"))
+                            outToClient.writeBytes("Content-Type: text/html\r\n");
+                        else
+                            outToClient.writeBytes("Content-Type: text/plain\r\n");
 
                         break;
                     case HttpMethod.POST:
@@ -83,7 +97,7 @@ public class HttpServer {
                 out.writeBytes("Date: " + new Date() + "\r\n");
                 out.writeBytes("Server: Austin's Really Cool HTTP Server\r\n");
                 out.writeBytes("Last-Modified: " + new Date() + "\r\n");
-                out.writeBytes("Content-Type: text/plain\r\n");
+                out.writeBytes("Content-Type: "+ contentType + "\r\n");
                 out.writeBytes("Content-Length: " + contentLength + "\r\n");
                 out.writeBytes("\r\n");
                 // out.writeBytes("Transfer-Encoding: chunked\r\n");
