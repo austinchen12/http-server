@@ -38,6 +38,8 @@ public class HttpServer {
                 Socket connectionSocket = listenSocket.accept();
                 HttpRequest request = new HttpRequest(connectionSocket);
                 
+                int contentLength = 0;
+                byte[] contentBytes;
                 switch (request.method) {
                     case HttpMethod.GET:
                         String virtualHostPath = virtualHosts.get(request.headers.get("Host"));
@@ -46,7 +48,26 @@ public class HttpServer {
                             continue;
                         }
 
-                        System.out.println("[DEBUG] GET " + virtualHostPath + request.path);
+                        // Make sure no relative path
+                        String[] parts = request.path.split("/");
+                        for (String part : parts) {
+                            if (part.equals("..")) {
+                                System.out.println("[ERROR] Relative path not allowed");
+                                continue;
+                            }
+                        }
+
+                        String path = System.getProperty("user.dir") + virtualHostPath + (request.path.equals("/") ? "/index.html" : request.path);
+                        file = new File(path);
+                        if (!file.exists()) {
+                            System.out.println("[ERROR] File not found: " + path);
+                            continue;
+                        }
+
+                        FileInputStream fileIn = new FileInputStream(file);
+                        byte[] contentBytes = new byte[contentLength];
+                        fileIn.read(contentBytes);
+
                         break;
                     case HttpMethod.POST:
                         System.out.println("[DEBUG] POST " + request.path);
@@ -63,10 +84,11 @@ public class HttpServer {
                 out.writeBytes("Server: Austin's Really Cool HTTP Server\r\n");
                 out.writeBytes("Last-Modified: " + new Date() + "\r\n");
                 out.writeBytes("Content-Type: text/plain\r\n");
-                out.writeBytes("Content-Length: 5\r\n");
-                // out.writeBytes("Transfer-Encoding: chunked\r\n")
+                out.writeBytes("Content-Length: " + contentLength + "\r\n");
                 out.writeBytes("\r\n");
-                out.writeBytes("Hello!\r\n");
+                // out.writeBytes("Transfer-Encoding: chunked\r\n");
+
+                out.write(contentBytes, 0, contentLength);
 
                 connectionSocket.close();
             } catch (Exception e) {
