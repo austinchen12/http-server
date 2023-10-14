@@ -7,7 +7,7 @@ public class HttpClient {
 
     public static void main(String[] args) {
         try {
-            Socket socket = new Socket("localhost", 8080);
+            Socket socket = new Socket("localhost", 6789);
 
             // Send request
             DataOutputStream out = new DataOutputStream(socket.getOutputStream());
@@ -15,7 +15,7 @@ public class HttpClient {
             // out.writeBytes("POST / HTTP/1.0\r\n");
             // out.writeBytes("Content-Type: application/x-www-form-urlencoded\r\n");
             // out.writeBytes("Content-Length: 11\r\n");
-            out.writeBytes("Host: localhost\r\n");
+            out.writeBytes("Host: cicada.cs.yale.edu\r\n");
             out.writeBytes("Accept: text/plain, text/html, text/*\r\n");
             out.writeBytes("User-Agent: MyHttpClient/1.0\r\n");
             out.writeBytes("If-Modified-Since: " + new Date() + "\r\n");
