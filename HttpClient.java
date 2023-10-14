@@ -11,7 +11,7 @@ public class HttpClient {
 
             // Send request
             DataOutputStream out = new DataOutputStream(socket.getOutputStream());
-            out.writeBytes("GET / HTTP/1.0\r\n");
+            out.writeBytes("GET /capitalize HTTP/1.0\r\n");
             // out.writeBytes("POST / HTTP/1.0\r\n");
             // out.writeBytes("Content-Type: application/x-www-form-urlencoded\r\n");
             // out.writeBytes("Content-Length: 11\r\n");

@@ -39,8 +39,8 @@ public class HttpServer {
                 HttpRequest request = new HttpRequest(connectionSocket);
                 
                 int contentLength = 0;
-                byte[] contentBytes;
-                String contentType;
+                byte[] contentBytes = null;
+                String contentType = "text/plain";
                 switch (request.method) {
                     case HttpMethod.GET:
                         String virtualHostPath = virtualHosts.get(request.headers.get("Host"));
@@ -63,24 +63,39 @@ public class HttpServer {
                             path += "index.html";
                         }
 
-                        file = new File(path);
+                        File file = new File(path);
                         if (!file.exists()) {
                             System.out.println("[ERROR] File not found: " + path);
                             continue;
                         }
 
-                        FileInputStream fileIn = new FileInputStream(file);
-                        byte[] contentBytes = new byte[contentLength];
-                        fileIn.read(contentBytes);
+                        if (file.canExecute()) {
+                            ProcessBuilder pb = new ProcessBuilder(path);
+                            Process p = pb.start();
+                            InputStream is = p.getInputStream();
+                            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+                            int nRead;
+                            byte[] data = new byte[1024];
+                            while ((nRead = is.read(data, 0, data.length)) != -1) {
+                                buffer.write(data, 0, nRead);
+                            }
+                            buffer.flush();
 
-                        if (request.path.endsWith(".jpg"))
-                            outToClient.writeBytes("Content-Type: image/jpeg\r\n");
-                        else if (request.path.endsWith(".gif"))
-                            outToClient.writeBytes("Content-Type: image/gif\r\n");
-                        else if (request.path.endsWith(".html") || request.path.endsWith(".htm"))
-                            outToClient.writeBytes("Content-Type: text/html\r\n");
-                        else
-                            outToClient.writeBytes("Content-Type: text/plain\r\n");
+                            contentBytes = buffer.toByteArray();
+                            contentLength = contentBytes.length;
+                        } else {
+                            contentLength = (int) file.length();
+                            FileInputStream fileIn = new FileInputStream(file);
+                            contentBytes = new byte[contentLength];
+                            fileIn.read(contentBytes);
+
+                            if (request.path.endsWith(".jpg"))
+                                contentType = "image/jpeg";
+                            else if (request.path.endsWith(".gif"))
+                                contentType = "image/gif";
+                            else if (request.path.endsWith(".html") || request.path.endsWith(".htm"))
+                                contentType = "text/html";
+                        }
 
                         break;
                     case HttpMethod.POST:

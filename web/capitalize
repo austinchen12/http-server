@@ -1,0 +1,11 @@
+#!/bin/bash
+
+echo "Potato"
+# # Prompt the user for input
+# read -p "Enter a string: " input
+
+# # Capitalize the input
+# capitalized_input=$(echo "$input" | tr '[:lower:]' '[:upper:]')
+
+# # Display the capitalized input
+# echo "Capitalized input: $capitalized_input"
