@@ -11,10 +11,10 @@ public class HttpClient {
 
             // Send request
             DataOutputStream out = new DataOutputStream(socket.getOutputStream());
-            out.writeBytes("GET /capitalize HTTP/1.0\r\n");
-            // out.writeBytes("POST / HTTP/1.0\r\n");
+            // out.writeBytes("GET /secret HTTP/1.0\r\n");
+            out.writeBytes("POST /secret HTTP/1.0\r\n");
             // out.writeBytes("Content-Type: application/x-www-form-urlencoded\r\n");
-            // out.writeBytes("Content-Length: 11\r\n");
+            out.writeBytes("Content-Length: 12\r\n");
             out.writeBytes("Host: cicada.cs.yale.edu\r\n");
             out.writeBytes("Accept: text/plain, text/html, text/*\r\n");
             out.writeBytes("User-Agent: MyHttpClient/1.0\r\n");
@@ -24,8 +24,8 @@ public class HttpClient {
             out.writeBytes("\r\n");
 
             // Write body
-            // out.writeBytes("item1=A&item2=B\r\n");
-            // out.writeBytes("\r\n");
+            out.writeBytes("super secret\r\n");
+            out.writeBytes("\r\n");
 
             // Get response
             BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));

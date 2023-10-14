@@ -37,40 +37,46 @@ public class HttpServer {
             {
                 Socket connectionSocket = listenSocket.accept();
                 HttpRequest request = new HttpRequest(connectionSocket);
+
+                String virtualHostPath = virtualHosts.get(request.headers.get("Host"));
+                if (virtualHostPath == null) {
+                    System.out.println("[ERROR] No virtual host found for " + request.headers.get("Host"));
+                    continue;
+                }
+
+                // Make sure no relative path
+                String[] parts = request.path.split("/");
+                for (String part : parts) {
+                    if (part.equals("..")) {
+                        System.out.println("[ERROR] Relative path not allowed");
+                        continue;
+                    }
+                }
+
+                String path = System.getProperty("user.dir") + virtualHostPath + request.path;
+                if (path.endsWith("/")) {
+                    path += "index.html";
+                }
+
+                File file = new File(path);
+                if (!file.exists()) {
+                    System.out.println("[ERROR] File not found: " + path);
+                    continue;
+                }
                 
                 int contentLength = 0;
                 byte[] contentBytes = null;
                 String contentType = "text/plain";
                 switch (request.method) {
                     case HttpMethod.GET:
-                        String virtualHostPath = virtualHosts.get(request.headers.get("Host"));
-                        if (virtualHostPath == null) {
-                            System.out.println("[ERROR] No virtual host found for " + request.headers.get("Host"));
-                            continue;
-                        }
-
-                        // Make sure no relative path
-                        String[] parts = request.path.split("/");
-                        for (String part : parts) {
-                            if (part.equals("..")) {
-                                System.out.println("[ERROR] Relative path not allowed");
-                                continue;
-                            }
-                        }
-
-                        String path = System.getProperty("user.dir") + virtualHostPath + request.path;
-                        if (path.endsWith("/")) {
-                            path += "index.html";
-                        }
-
-                        File file = new File(path);
-                        if (!file.exists()) {
-                            System.out.println("[ERROR] File not found: " + path);
-                            continue;
-                        }
-
                         if (file.canExecute()) {
                             ProcessBuilder pb = new ProcessBuilder(path);
+                            Map<String, String> environment = pb.environment();
+                            environment.put("REQUEST_METHOD", request.method.toString());
+                            environment.put("REMOTE_ADDR", connectionSocket.getInetAddress().getHostAddress());
+                            environment.put("REMOTE_PORT", Integer.toString(connectionSocket.getPort()));
+                            environment.put("SERVER_NAME", "Austin's Really Cool HTTP Server");
+
                             Process p = pb.start();
                             InputStream is = p.getInputStream();
                             ByteArrayOutputStream buffer = new ByteArrayOutputStream();
@@ -99,7 +105,30 @@ public class HttpServer {
 
                         break;
                     case HttpMethod.POST:
-                        System.out.println("[DEBUG] POST " + request.path);
+                        if (file.canExecute()) {
+                            ProcessBuilder pb = new ProcessBuilder(path, request.body);
+                            Map<String, String> environment = pb.environment();
+                            environment.put("REQUEST_METHOD", request.method.toString());
+                            environment.put("REMOTE_ADDR", connectionSocket.getInetAddress().getHostAddress());
+                            environment.put("REMOTE_PORT", Integer.toString(connectionSocket.getPort()));
+                            environment.put("SERVER_NAME", "Austin's Really Cool HTTP Server");
+
+                            Process p = pb.start();
+                            InputStream is = p.getInputStream();
+                            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+                            int nRead;
+                            byte[] data = new byte[1024];
+                            while ((nRead = is.read(data, 0, data.length)) != -1) {
+                                buffer.write(data, 0, nRead);
+                            }
+                            buffer.flush();
+
+                            contentBytes = buffer.toByteArray();
+                            contentLength = contentBytes.length;
+                        } else {
+                            // TODO: do something
+                        }
+
                         break;
                     default:
                         System.out.println("[ERROR] Unsupported method: " + request.method);

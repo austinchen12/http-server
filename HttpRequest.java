@@ -9,7 +9,7 @@ public class HttpRequest {
     public String path;
     public String version;
     public Map<String, String> headers = new HashMap<String, String>();
-    public byte[] body;
+    public String body;
 
     public HttpRequest(Socket connection) throws Exception {
         this.connection = connection;
@@ -36,10 +36,11 @@ public class HttpRequest {
         // If Content-Length is present, read body
         if (headers.containsKey("Content-Length")) {
             int contentLength = Integer.parseInt(headers.get("Content-Length"));
-            body = new byte[contentLength];
+            byte[] bytes = new byte[contentLength];
             for (int i = 0; i < contentLength; i++) {
-                body[i] = (byte) in.read();
+                bytes[i] = (byte) in.read();
             }
+            body = new String(bytes);
         }
     }
 }
