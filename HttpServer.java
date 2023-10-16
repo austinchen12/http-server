@@ -286,9 +286,9 @@ public class HttpServer {
 
         // Send response
         out.put("HTTP/1.0 200 OK\r\n".getBytes(StandardCharsets.UTF_8));
-        out.put(("Date: " + new Date() + "\r\n").getBytes(StandardCharsets.UTF_8));
+        out.put(("Date: " + Utils.getFormattedDate(new Date()) + "\r\n").getBytes(StandardCharsets.UTF_8));
         out.put(("Server: Austin's Really Cool HTTP Server\r\n").getBytes(StandardCharsets.UTF_8));
-        out.put(("Last-Modified: " + new Date() + "\r\n").getBytes(StandardCharsets.UTF_8));
+        out.put(("Last-Modified: " + Utils.getFormattedDate(lastModifiedDate) + "\r\n").getBytes(StandardCharsets.UTF_8));
         out.put(("Content-Type: "+ contentType + "\r\n").getBytes(StandardCharsets.UTF_8));
         out.put(("Content-Length: " + contentLength + "\r\n").getBytes(StandardCharsets.UTF_8));
         out.put("\r\n".getBytes(StandardCharsets.UTF_8));

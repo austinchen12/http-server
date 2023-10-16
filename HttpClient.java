@@ -42,7 +42,7 @@ public class HttpClient {
         out.writeBytes("Host: cicada.cs.yale.edu\r\n");
         out.writeBytes("Accept: text/plain, text/html\r\n");
         out.writeBytes("User-Agent: iPhone/1.0\r\n");
-        // out.writeBytes("If-Modified-Since: " + Utils.getFormattedNow() + "\r\n");
+        // out.writeBytes("If-Modified-Since: " + Utils.getFormattedDate(new Date()) + "\r\n");
         out.writeBytes("Connection: close\r\n");
         out.writeBytes("Authorization: Basic " + Base64.getEncoder().encodeToString("username:password".getBytes()) + "\r\n");
         out.writeBytes("\r\n");
@@ -70,7 +70,7 @@ public class HttpClient {
         out.writeBytes("Host: cicada.cs.yale.edu\r\n");
         out.writeBytes("Accept: text/plain, text/html\r\n");
         out.writeBytes("User-Agent: MyHttpClient/1.0\r\n");
-        out.writeBytes("If-Modified-Since: " + Utils.getFormattedNow() + "\r\n");
+        out.writeBytes("If-Modified-Since: " + Utils.getFormattedDate(new Date()) + "\r\n");
         out.writeBytes("Connection: close\r\n");
         out.writeBytes("Authorization: Basic " + Base64.getEncoder().encodeToString("username:password".getBytes()) + "\r\n");
         out.writeBytes("\r\n");
@@ -99,7 +99,7 @@ public class HttpClient {
         out.writeBytes("Host: cicada.cs.yale.edu\r\n");
         out.writeBytes("Accept: text/plain, text/html\r\n");
         out.writeBytes("User-Agent: MyHttpClient/1.0\r\n");
-        out.writeBytes("If-Modified-Since: " + Utils.getFormattedNow() + "\r\n");
+        out.writeBytes("If-Modified-Since: " + Utils.getFormattedDate(new Date()) + "\r\n");
         out.writeBytes("Connection: close\r\n");
         out.writeBytes("Authorization: Basic " + Base64.getEncoder().encodeToString("username:password".getBytes()) + "\r\n");
         out.writeBytes("\r\n");

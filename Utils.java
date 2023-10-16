@@ -44,9 +44,9 @@ class Utils {
         return result;
     }
 
-    public static String getFormattedNow() {
+    public static String getFormattedDate(Date date) {
         SimpleDateFormat dateFormat = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss 'GMT'", Locale.ENGLISH);
-        return dateFormat.format(new Date());
+        return dateFormat.format(date);
     }
 
     public static Date parseFormattedDate(String date) throws Exception {
