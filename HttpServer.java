@@ -75,6 +75,12 @@ public class HttpServer {
                         SocketChannel clientChannel = (SocketChannel) key.channel();
                         RequestState state = (RequestState) key.attachment();
 
+                        if (System.currentTimeMillis() - state.connectionTime > 3000) {
+                            System.out.println("[DEBUG] Connection timed out");
+                            clientChannel.close();
+                            continue;
+                        }
+
                         // Assuming 1024 bytes is enough
                         ByteBuffer bytes = ByteBuffer.allocate(1024);
                         int bytesRead = clientChannel.read(bytes);
