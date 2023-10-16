@@ -19,6 +19,7 @@ public class HttpRequest {
     public Date ifModifiedSinceDate;
     public boolean keepAlive = false;
     public String[] credentials;
+    public Map<String, String> queryParams = new HashMap<String, String>();
 
     public static List<String> PossibleAcceptTypes = Arrays.asList("text/html", "text/plain", "application/json", "image/jpeg", "image/png", "image/gif", "application/pdf", "application/zip", "application/gzip", "application/x-tar", "application/x-bzip2", "application/x-rar-compressed", "application/x-7z-compressed", "audio/mpeg", "audio/ogg", "audio/wav", "audio/webm", "video/mp4", "video/ogg", "video/webm", "application/octet-stream");
 
@@ -32,7 +33,7 @@ public class HttpRequest {
         String requestLine = lines[count++];
         String[] requestLineParts = requestLine.split(" ");
         this.method = HttpMethod.valueOf(requestLineParts[0]);
-        this.path = requestLineParts[1];
+        this.path = extractQueryParams(requestLineParts[1]);
         this.version = requestLineParts[2];
 
         // Read headers
@@ -60,6 +61,19 @@ public class HttpRequest {
         } catch (Exception e) {
             System.out.println("[ERROR] Malformed headers: " + e.getMessage());
         }
+    }
+
+    private String extractQueryParams(String line) {
+        int index = line.indexOf("?");
+        if (index != -1) {
+            String[] parts = line.substring(index + 1).split("&");
+            for (String part : parts) {
+                String[] keyValue = part.split("=");
+                queryParams.put(keyValue[0], keyValue[1]);
+            }
+        }
+        System.out.println(index + ", " + queryParams.size() + ", " + line + ", " + (index == -1 ? line : line.substring(0, index)));
+        return index == -1 ? line : line.substring(0, index);
     }
     
     private void processHeaders() throws Exception {
@@ -104,7 +118,7 @@ public class HttpRequest {
                 throw new Exception("Invalid connection type");
             }
         }
-        
+
         if (headers.containsKey("Authorization")) {
             String[] parts = headers.get("Authorization").split(" ");
 

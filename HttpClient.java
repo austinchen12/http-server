@@ -36,7 +36,7 @@ public class HttpClient {
     private static void sendGetRequest(String url) throws Exception {
         Socket socket = new Socket("localhost", 6789);
 
-        Thread.sleep(4000);
+        // Thread.sleep(4000);
         
         // Send request
         DataOutputStream out = new DataOutputStream(socket.getOutputStream());
