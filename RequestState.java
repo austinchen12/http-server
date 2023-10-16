@@ -7,22 +7,17 @@ import java.nio.channels.*;
 
 public class RequestState {
     public HttpRequest request;
+    public HttpResponse response;
     public ByteBuffer in;
-    public ByteBuffer out;
     public long connectionTime;
 
     public RequestState() {
         in = ByteBuffer.allocate(1024);
-        out = ByteBuffer.allocate(1024);
         connectionTime = System.currentTimeMillis();
     }
 
     public ByteBuffer getInBytes() {
         return in;
-    }
-
-    public ByteBuffer getOutBytes() {
-        return out;
     }
 
     public void appendInBytes(ByteBuffer bytes, int length) {

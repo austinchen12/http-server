@@ -19,6 +19,7 @@ public class HttpServer {
             return;
         }
         
+        // Load configuration
         try {
             List<Map<String, String>> result = Utils.loadConfiguration(args[1]);
             config = result.get(0);
@@ -29,6 +30,7 @@ public class HttpServer {
         
         int serverPort = Integer.parseInt(config.get("Listen"));
 
+        // Create welcome socket and selector
         ServerSocketChannel listenChannel;
         Selector selector;
         try {
@@ -47,37 +49,43 @@ public class HttpServer {
         System.out.println("[DEBUG] Server listening on port " + serverPort);
 
         while (true) {
+            // Block until at least one channel is ready
             try {
                 selector.select();
             } catch (IOException ex) {
-                ex.printStackTrace();
+                System.out.println("[ERROR] Selector error: " + ex.getMessage());
                 break;
             }
 
+            // Handle all ready keys
             Set readyKeys = selector.selectedKeys();
             Iterator iterator = readyKeys.iterator();
-
             while (iterator.hasNext()) {
                 SelectionKey key = (SelectionKey) iterator.next();
                 iterator.remove();
                 try {
                     if (key.isAcceptable()) {
                         ServerSocketChannel serverChannel = (ServerSocketChannel) key.channel();
-                        SocketChannel clientChannel = serverChannel.accept();
 
+                        // Create client channel
+                        SocketChannel clientChannel = serverChannel.accept();
                         clientChannel.configureBlocking(false);
 
+                        // Register client channel with selector
                         SelectionKey clientKey = clientChannel.register(selector, SelectionKey.OP_READ);
+
+                        // Attach channel state
                         RequestState state = new RequestState();
                         clientKey.attach(state);
-
                     } else if ((key.readyOps() & SelectionKey.OP_READ) != 0) {
                         SocketChannel clientChannel = (SocketChannel) key.channel();
                         RequestState state = (RequestState) key.attachment();
 
+                        // If connection timed out, send 408
                         if (System.currentTimeMillis() - state.connectionTime > 3000) {
                             System.out.println("[DEBUG] Connection timed out");
-                            clientChannel.close();
+                            state.response = new HttpResponse(408, "Request Timeout");
+                            key.interestOps(SelectionKey.OP_WRITE);
                             continue;
                         }
 
@@ -99,49 +107,61 @@ public class HttpServer {
                                     continue;
                                 }
 
-                                state.in.flip();
-                                handleRequest(clientChannel.socket(), request, state.out);
                                 state.request = request;
+
+                                // Prepare input buffer to read and handle request
+                                state.in.flip();
+                                state.response = handleRequest(clientChannel.socket(), request);
                             } catch(Exception e) {
-                                System.out.println("[ERROR] Failed to process request: " + e.getMessage());
+                                System.out.println("[DEBUG] Failed to process request: " + e.getMessage());
+                                state.response = new HttpResponse(500, "Internal Server Error");
                             }
 
-                            state.out.flip();
+                            // Prepare output buffer to read and switch to write
                             key.interestOps(SelectionKey.OP_WRITE);
                         }
                     } else if ((key.readyOps() & SelectionKey.OP_WRITE) != 0) {
                         SocketChannel clientChannel = (SocketChannel) key.channel();
                         RequestState state = (RequestState) key.attachment();
 
-                        if (state.out.hasRemaining()) {
-                            clientChannel.write(state.out);
-                        } else if (!state.request.keepAlive) {
-                            clientChannel.close();
+                        // Write response until empty, then close channel if timeout or not keep-alive
+                        if (state.response.outputBuffer.hasRemaining()) {
+                            clientChannel.write(state.response.outputBuffer);
+                        } else {
+                            if (state.response.statusCode == 408 || !state.request.keepAlive) {
+                                clientChannel.close();
+                            }
                         }
                     }
                 } catch (IOException ex) {
+                    System.out.println("[ERROR] Failed to process request: " + ex.getMessage());
                     key.cancel();
                     try {
                         key.channel().close();
-                    } catch (IOException cex) {}
+                    } catch (IOException cex) {
+                        System.out.println("[ERROR] Failed to close channel: " + cex.getMessage());
+                    }
                 }
             }
         }
     }
 
-    private static void handleRequest(Socket connectionSocket, HttpRequest request, ByteBuffer out) throws Exception {
+    private static HttpResponse handleRequest(Socket connectionSocket, HttpRequest request) throws Exception {
+        int statusCode;
+        String statusMessage;
+
         String virtualHostPath = virtualHosts.get(request.headers.get("Host"));
         if (virtualHostPath == null) {
-            System.out.println("[ERROR] No virtual host found for " + request.headers.get("Host"));
-            return;
+            System.out.println("[DEBUG] No virtual host found for " + request.headers.get("Host"));
+            return new HttpResponse(400, "Malformed Request");
         }
 
         // Make sure no relative path
         String[] parts = request.path.split("/");
         for (String part : parts) {
             if (part.equals("..")) {
-                System.out.println("[ERROR] Relative path not allowed");
-                return;
+                System.out.println("[DEBUG] Relative path not allowed");
+                return new HttpResponse(400, "Malformed Request");
             }
         }
 
@@ -157,8 +177,8 @@ public class HttpServer {
 
         File file = new File(path);
         if (!file.exists()) {
-            System.out.println("[ERROR] File not found: " + path);
-            return;
+            System.out.println("[DEBUG] File not found: " + path);
+            return new HttpResponse(404, "Not Found");
         }
 
         Path filePath = Path.of(path);
@@ -166,20 +186,20 @@ public class HttpServer {
         try {
             contentType = file.canExecute() ? "text/plain" : Files.probeContentType(filePath);
         } catch (Exception e) {
-            System.out.println("[ERROR] Failed to get content type: " + e.getMessage());
-            return;
+            System.out.println("[DEBUG] Failed to get content type: " + e.getMessage());
+            return new HttpResponse(400, "Malformed Request");
         }
 
         if (!request.acceptTypes.contains(contentType)) {
-            System.out.println("[ERROR] Content type not accepted by user: " + path + ", " + contentType);
-            return;
+            System.out.println("[DEBUG] Content type not accepted by user: " + path + ", " + contentType);
+            return new HttpResponse(406, "Not Acceptable");
         }
 
         long lastModifiedMillis = file.lastModified();
         Date lastModifiedDate = new Date(lastModifiedMillis);
         if (!file.canExecute() && request.ifModifiedSinceDate != null && lastModifiedDate.before(request.ifModifiedSinceDate)) {
             System.out.println("[DEBUG] File not modified since " + request.ifModifiedSinceDate + ": " + path);
-            return; // TODO: 304 status code
+            return new HttpResponse(304, "Not Modified");
         }
 
         File htaccess = new File(file.getParent() + "/.htaccess");
@@ -201,8 +221,8 @@ public class HttpServer {
             // If .htaccess file is invalidly formatted, ignore
             boolean validAuthConfig = authName != null && user != null && password != null;
             if (validAuthConfig && (request.credentials == null || !request.credentials[0].equals(user) || !request.credentials[1].equals(password))) {
-                System.out.println("[ERROR] Invalid credentials");
-                return; // return authName
+                System.out.println("[DEBUG] Invalid credentials");
+                return new HttpResponse(401, "Unauthorized");
             }
         }
         
@@ -216,7 +236,7 @@ public class HttpServer {
                     environment.put("REQUEST_METHOD", request.method.toString());
                     environment.put("REMOTE_ADDR", connectionSocket.getInetAddress().getHostAddress());
                     environment.put("REMOTE_PORT", Integer.toString(connectionSocket.getPort()));
-                    environment.put("SERVER_NAME", "Austin's Really Cool HTTP Server");
+                    environment.put("SERVER_NAME", Utils.ServerName);
 
                     Process p = pb.start();
                     InputStream is = p.getInputStream();
@@ -230,14 +250,16 @@ public class HttpServer {
 
                     contentBytes = buffer.toByteArray();
                     contentLength = contentBytes.length;
+
+                    return new HttpResponse(200, "OK", lastModifiedDate, contentType, contentBytes);
                 } else {
                     contentLength = (int) file.length();
                     FileInputStream fileIn = new FileInputStream(file);
                     contentBytes = new byte[contentLength];
                     fileIn.read(contentBytes);
+                    
+                    return new HttpResponse(200, "OK", lastModifiedDate, contentType, contentBytes);
                 }
-
-                break;
             case HttpMethod.POST:
                 if (file.canExecute()) {
                     ProcessBuilder pb = new ProcessBuilder(path, request.body);
@@ -245,7 +267,7 @@ public class HttpServer {
                     environment.put("REQUEST_METHOD", request.method.toString());
                     environment.put("REMOTE_ADDR", connectionSocket.getInetAddress().getHostAddress());
                     environment.put("REMOTE_PORT", Integer.toString(connectionSocket.getPort()));
-                    environment.put("SERVER_NAME", "Austin's Really Cool HTTP Server");
+                    environment.put("SERVER_NAME", Utils.ServerName);
 
                     Process p = pb.start();
                     InputStream is = p.getInputStream();
@@ -263,14 +285,14 @@ public class HttpServer {
                     // TODO: do something
                 }
 
-                break;
+                return new HttpResponse(201, "Created");
             case HttpMethod.DELETE:
                 ProcessBuilder pb = new ProcessBuilder(path);
                 Map<String, String> environment = pb.environment();
                 environment.put("REQUEST_METHOD", request.method.toString());
                 environment.put("REMOTE_ADDR", connectionSocket.getInetAddress().getHostAddress());
                 environment.put("REMOTE_PORT", Integer.toString(connectionSocket.getPort()));
-                environment.put("SERVER_NAME", "Austin's Really Cool HTTP Server");
+                environment.put("SERVER_NAME", Utils.ServerName);
 
                 Process p = pb.start();
                 InputStream is = p.getInputStream();
@@ -284,21 +306,11 @@ public class HttpServer {
 
                 contentBytes = buffer.toByteArray();
                 contentLength = contentBytes.length;
-                break;
+                
+                return new HttpResponse(204, "No Content");
             default:
-                System.out.println("[ERROR] Unsupported method: " + request.method);
-                return;
+                System.out.println("[DEBUG] Unsupported method: " + request.method);
+                return new HttpResponse(501, "Not Implemented");
         }
-
-        // Send response
-        out.put("HTTP/1.0 200 OK\r\n".getBytes(StandardCharsets.UTF_8));
-        out.put(("Date: " + Utils.getFormattedDate(new Date()) + "\r\n").getBytes(StandardCharsets.UTF_8));
-        out.put(("Server: Austin's Really Cool HTTP Server\r\n").getBytes(StandardCharsets.UTF_8));
-        out.put(("Last-Modified: " + Utils.getFormattedDate(lastModifiedDate) + "\r\n").getBytes(StandardCharsets.UTF_8));
-        out.put(("Content-Type: "+ contentType + "\r\n").getBytes(StandardCharsets.UTF_8));
-        out.put(("Content-Length: " + contentLength + "\r\n").getBytes(StandardCharsets.UTF_8));
-        out.put("\r\n".getBytes(StandardCharsets.UTF_8));
-
-        out.put(contentBytes);
     }
 }

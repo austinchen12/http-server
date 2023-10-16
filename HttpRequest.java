@@ -56,11 +56,7 @@ public class HttpRequest {
             body = new String(bytes);
         }
 
-        try {
-            processHeaders();
-        } catch (Exception e) {
-            System.out.println("[ERROR] Malformed headers: " + e.getMessage());
-        }
+        processHeaders();
     }
 
     private String extractQueryParams(String line) {
@@ -72,7 +68,7 @@ public class HttpRequest {
                 queryParams.put(keyValue[0], keyValue[1]);
             }
         }
-        System.out.println(index + ", " + queryParams.size() + ", " + line + ", " + (index == -1 ? line : line.substring(0, index)));
+
         return index == -1 ? line : line.substring(0, index);
     }
     

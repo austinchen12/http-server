@@ -7,6 +7,9 @@ import java.text.SimpleDateFormat;
 import java.util.Locale;
 
 class Utils {
+    public static String ServerName = "Austin's Really Cool HTTP Server";
+    public static int TimeoutLength = 3000;
+
     public static List<Map<String, String>> loadConfiguration(String path) throws Exception {
         List<Map<String, String>> result = new ArrayList<>();
 
