@@ -239,6 +239,10 @@ public class HttpServer {
             case HttpMethod.GET:
                 if (file.canExecute()) {
                     contentBytes = executeDynamicFile(request, connectionSocket, path);
+                    if (contentBytes == null) {
+                        return new HttpResponse(400, "Bad Request");
+                    }
+                    
                     contentLength = contentBytes.length;
 
                     return new HttpResponse(200, "OK", lastModifiedDate, contentType, contentBytes);
@@ -257,6 +261,10 @@ public class HttpServer {
                 }
                 
                 contentBytes = executeDynamicFile(request, connectionSocket, path, request.body);
+                if (contentBytes == null) {
+                    return new HttpResponse(400, "Bad Request");
+                }
+
                 contentLength = contentBytes.length;
 
                 return new HttpResponse(201, "Created");
@@ -267,6 +275,10 @@ public class HttpServer {
                 }
 
                 contentBytes = executeDynamicFile(request, connectionSocket, path);
+                if (contentBytes == null) {
+                    return new HttpResponse(400, "Bad Request");
+                }
+
                 contentLength = contentBytes.length;
                 
                 return new HttpResponse(204, "No Content");
@@ -294,6 +306,8 @@ public class HttpServer {
         }
         buffer.flush();
 
-        return buffer.toByteArray();
+        int exitCode = p.waitFor();
+
+        return exitCode == 0 ? buffer.toByteArray() : null;
     }
 }
