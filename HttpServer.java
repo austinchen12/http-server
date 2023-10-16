@@ -4,11 +4,13 @@ import java.util.*;
 import java.nio.*;
 import java.nio.channels.*;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 
 public class HttpServer {
-    public static Map<String, String> config = new HashMap<String, String>();
-    public static Map<String, String> virtualHosts = new HashMap<String, String>();
+    public static Map<String, String> config;
+    public static Map<String, String> virtualHosts;
 
     public static void main(String[] args) {
         // Accept one argument -config <path to config file>
@@ -18,7 +20,9 @@ public class HttpServer {
         }
         
         try {
-            loadConfiguration(args[1]);
+            List<Map<String, String>> result = Utils.loadConfiguration(args[1]);
+            config = result.get(0);
+            virtualHosts = result.get(1);
         } catch (Exception e) {
             System.out.println("[ERROR] Failed to load configuration: " + e.getMessage());
         }
@@ -76,7 +80,10 @@ public class HttpServer {
                         int bytesRead = clientChannel.read(bytes);
                         state.appendInBytes(bytes, bytesRead);
 
-        
+                        // State.endsInDoubleCRLF is true if the request ends in \r\n\r\n, which should happen at most twice.
+                        // Might happen twice if its a POST request and buffer happens to end right before the body starts.
+                        // But not necessarily, so I need to process as if the body is included, and just ignore if we
+                        // didn't catch double CRLF in a POST request.
                         if (state.endsInDoubleCRLF()) {
                             try {
                                 HttpRequest request = new HttpRequest(state.in);
@@ -88,6 +95,7 @@ public class HttpServer {
 
                                 state.in.flip();
                                 handleRequest(clientChannel.socket(), request, state.out);
+                                state.request = request;
                             } catch(Exception e) {
                                 System.out.println("[ERROR] Failed to process request: " + e.getMessage());
                             }
@@ -101,7 +109,7 @@ public class HttpServer {
 
                         if (state.out.hasRemaining()) {
                             clientChannel.write(state.out);
-                        } else {
+                        } else if (!state.request.keepAlive) {
                             clientChannel.close();
                         }
                     }
@@ -111,34 +119,6 @@ public class HttpServer {
                         key.channel().close();
                     } catch (IOException cex) {}
                 }
-            }
-        }
-    }
-
-    private static void loadConfiguration(String path) throws Exception {
-        InputStream inputStream = new FileInputStream(new File(path));
-
-        ApacheConfigParser parser = new ApacheConfigParser();
-        ConfigNode root = parser.parse(inputStream);
-
-        // Create stack
-        Stack<ConfigNode> stack = new Stack<ConfigNode>();
-        for (ConfigNode child : root.getChildren()) {
-            stack.push(child);
-        }
-
-        // Populate config
-        while (!stack.empty()) {
-            ConfigNode node = stack.pop();
-
-            if (node.getName().equals("VirtualHost")) {
-                List<ConfigNode> children = node.getChildren();
-                String serverName = children.get(0).getName().equals("ServerName") ? children.get(0).getContent() : children.get(1).getContent();
-                String documentRoot = children.get(0).getName().equals("ServerName") ? children.get(1).getContent() : children.get(0).getContent();
-                virtualHosts.put(serverName, documentRoot);
-                continue;
-            } else {
-                config.put(node.getName(), node.getContent());
             }
         }
     }
@@ -161,7 +141,12 @@ public class HttpServer {
 
         String path = System.getProperty("user.dir") + virtualHostPath + request.path;
         if (path.endsWith("/")) {
-            path += "index.html";
+            File mobileIndex = new File(path + "index_m.html");
+            if (request.isMobileUserAgent && mobileIndex.exists()) {
+                path += "index_m.html";
+            } else {
+                path += "index.html";
+            }
         }
 
         File file = new File(path);
@@ -169,10 +154,54 @@ public class HttpServer {
             System.out.println("[ERROR] File not found: " + path);
             return;
         }
+
+        Path filePath = Path.of(path);
+        String contentType;
+        try {
+            contentType = file.canExecute() ? "text/plain" : Files.probeContentType(filePath);
+        } catch (Exception e) {
+            System.out.println("[ERROR] Failed to get content type: " + e.getMessage());
+            return;
+        }
+
+        if (!request.acceptTypes.contains(contentType)) {
+            System.out.println("[ERROR] Content type not accepted by user: " + path + ", " + contentType);
+            return;
+        }
+
+        long lastModifiedMillis = file.lastModified();
+        Date lastModifiedDate = new Date(lastModifiedMillis);
+        if (!file.canExecute() && request.ifModifiedSinceDate != null && lastModifiedDate.before(request.ifModifiedSinceDate)) {
+            System.out.println("[DEBUG] File not modified since " + request.ifModifiedSinceDate + ": " + path);
+            return; // TODO: 304 status code
+        }
+
+        File htaccess = new File(file.getParent() + "/.htaccess");
+        if (htaccess.exists()) {
+            BufferedReader reader = new BufferedReader(new FileReader(htaccess));
+            String line;
+            String authName = null, user = null, password = null;
+            while ((line = reader.readLine()) != null) {
+                String[] keyValuePair = line.split(" ");
+                if (keyValuePair[0].equals("AuthName")) {
+                    authName = keyValuePair[1];
+                } else if (keyValuePair[0].equals("User")) {
+                    user = keyValuePair[1];
+                } else if (keyValuePair[0].equals("Password")) {
+                    password = keyValuePair[1];
+                }
+            }
+
+            // If .htaccess file is invalidly formatted, ignore
+            boolean validAuthConfig = authName != null && user != null && password != null;
+            if (validAuthConfig && (request.credentials == null || !request.credentials[0].equals(user) || !request.credentials[1].equals(password))) {
+                System.out.println("[ERROR] Invalid credentials");
+                return; // return authName
+            }
+        }
         
         int contentLength = 0;
         byte[] contentBytes = null;
-        String contentType = "text/plain";
         switch (request.method) {
             case HttpMethod.GET:
                 if (file.canExecute()) {
@@ -200,13 +229,6 @@ public class HttpServer {
                     FileInputStream fileIn = new FileInputStream(file);
                     contentBytes = new byte[contentLength];
                     fileIn.read(contentBytes);
-
-                    if (request.path.endsWith(".jpg"))
-                        contentType = "image/jpeg";
-                    else if (request.path.endsWith(".gif"))
-                        contentType = "image/gif";
-                    else if (request.path.endsWith(".html") || request.path.endsWith(".htm"))
-                        contentType = "text/html";
                 }
 
                 break;

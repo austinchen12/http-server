@@ -6,10 +6,11 @@ import java.nio.channels.*;
 
 
 public class RequestState {
+    public HttpRequest request;
     public ByteBuffer in;
     public ByteBuffer out;
 
-    public RequestState() {        
+    public RequestState() {
         in = ByteBuffer.allocate(1024);
         out = ByteBuffer.allocate(1024);
     }

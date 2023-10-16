@@ -2,6 +2,7 @@ import java.io.*;
 import java.net.*;
 import java.util.*;
 
+
 public class HttpClient {
     public Map<String, String> configuration = new HashMap<String, String>();
 
@@ -39,9 +40,9 @@ public class HttpClient {
         DataOutputStream out = new DataOutputStream(socket.getOutputStream());
         out.writeBytes("GET " + url + " HTTP/1.0\r\n");
         out.writeBytes("Host: cicada.cs.yale.edu\r\n");
-        out.writeBytes("Accept: text/plain, text/html, text/*\r\n");
-        out.writeBytes("User-Agent: MyHttpClient/1.0\r\n");
-        out.writeBytes("If-Modified-Since: " + new Date() + "\r\n");
+        out.writeBytes("Accept: text/plain, text/html\r\n");
+        out.writeBytes("User-Agent: iPhone/1.0\r\n");
+        // out.writeBytes("If-Modified-Since: " + Utils.getFormattedNow() + "\r\n");
         out.writeBytes("Connection: close\r\n");
         out.writeBytes("Authorization: Basic " + Base64.getEncoder().encodeToString("username:password".getBytes()) + "\r\n");
         out.writeBytes("\r\n");
@@ -67,9 +68,9 @@ public class HttpClient {
         out.writeBytes("Content-Type: application/x-www-form-urlencoded\r\n");
         out.writeBytes("Content-Length: " + message.length() + "\r\n");
         out.writeBytes("Host: cicada.cs.yale.edu\r\n");
-        out.writeBytes("Accept: text/plain, text/html, text/*\r\n");
+        out.writeBytes("Accept: text/plain, text/html\r\n");
         out.writeBytes("User-Agent: MyHttpClient/1.0\r\n");
-        out.writeBytes("If-Modified-Since: " + new Date() + "\r\n");
+        out.writeBytes("If-Modified-Since: " + Utils.getFormattedNow() + "\r\n");
         out.writeBytes("Connection: close\r\n");
         out.writeBytes("Authorization: Basic " + Base64.getEncoder().encodeToString("username:password".getBytes()) + "\r\n");
         out.writeBytes("\r\n");
@@ -96,9 +97,9 @@ public class HttpClient {
         DataOutputStream out = new DataOutputStream(socket.getOutputStream());
         out.writeBytes("DELETE " + url + " HTTP/1.0\r\n");
         out.writeBytes("Host: cicada.cs.yale.edu\r\n");
-        out.writeBytes("Accept: text/plain, text/html, text/*\r\n");
+        out.writeBytes("Accept: text/plain, text/html\r\n");
         out.writeBytes("User-Agent: MyHttpClient/1.0\r\n");
-        out.writeBytes("If-Modified-Since: " + new Date() + "\r\n");
+        out.writeBytes("If-Modified-Since: " + Utils.getFormattedNow() + "\r\n");
         out.writeBytes("Connection: close\r\n");
         out.writeBytes("Authorization: Basic " + Base64.getEncoder().encodeToString("username:password".getBytes()) + "\r\n");
         out.writeBytes("\r\n");
