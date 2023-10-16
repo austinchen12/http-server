@@ -177,9 +177,9 @@ public class HttpServer {
             }
         }
 
-        // Check if file exists
+        // Check if file exists and isn't a directory
         File file = new File(path);
-        if (!file.exists()) {
+        if (!file.exists() || file.isDirectory()) {
             System.out.println("[DEBUG] File not found: " + path);
             return new HttpResponse(404, "Not Found");
         }
@@ -229,7 +229,7 @@ public class HttpServer {
             boolean validAuthConfig = authName != null && user != null && password != null;
             if (validAuthConfig && (request.credentials == null || !request.credentials[0].equals(user) || !request.credentials[1].equals(password))) {
                 System.out.println("[DEBUG] Invalid credentials");
-                return new HttpResponse(401, "Unauthorized");
+                return new HttpResponse(401, "Unauthorized", authName);
             }
         }
         
@@ -238,8 +238,7 @@ public class HttpServer {
         switch (request.method) {
             case HttpMethod.GET:
                 if (file.canExecute()) {
-                    ByteArrayOutputStream buffer = executeDynamicFile(path);
-                    contentBytes = buffer.toByteArray();
+                    contentBytes = executeDynamicFile(request, connectionSocket, path);
                     contentLength = contentBytes.length;
 
                     return new HttpResponse(200, "OK", lastModifiedDate, contentType, contentBytes);
@@ -252,24 +251,22 @@ public class HttpServer {
                     return new HttpResponse(200, "OK", lastModifiedDate, contentType, contentBytes);
                 }
             case HttpMethod.POST:
-                if (!file.isExecutable()) {
+                if (!file.canExecute()) {
                     System.out.println("[DEBUG] File not executable: " + path);
                     return new HttpResponse(500, "Internal Server Error");
                 }
                 
-                ByteArrayOutputStream buffer = executeDynamicFile(path, request.body);
-                contentBytes = buffer.toByteArray();
+                contentBytes = executeDynamicFile(request, connectionSocket, path, request.body);
                 contentLength = contentBytes.length;
 
                 return new HttpResponse(201, "Created");
             case HttpMethod.DELETE:
-                if (!file.isExecutable()) {
+                if (!file.canExecute()) {
                     System.out.println("[DEBUG] File not executable: " + path);
                     return new HttpResponse(500, "Internal Server Error");
                 }
 
-                ByteArrayOutputStream buffer = executeDynamicFile(path);
-                contentBytes = buffer.toByteArray();
+                contentBytes = executeDynamicFile(request, connectionSocket, path);
                 contentLength = contentBytes.length;
                 
                 return new HttpResponse(204, "No Content");
@@ -279,7 +276,7 @@ public class HttpServer {
         }
     }
 
-    private static ByteArrayOutputStream executeDynamicFile(String... args) {
+    private static byte[] executeDynamicFile(HttpRequest request, Socket connectionSocket, String... args) throws Exception {
         ProcessBuilder pb = new ProcessBuilder(args);
         Map<String, String> environment = pb.environment();
         environment.put("REQUEST_METHOD", request.method.toString());
@@ -297,6 +294,6 @@ public class HttpServer {
         }
         buffer.flush();
 
-        return buffer;
+        return buffer.toByteArray();
     }
 }
