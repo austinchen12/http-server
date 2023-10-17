@@ -10,12 +10,16 @@ import java.nio.file.Path;
 
 class HttpDispatch implements Runnable {
     private int id;
+    private int currentConnections;
     private Selector selector;
     private Map<String, String> config;
     private Map<String, String> virtualHosts;
 
+    public static volatile boolean shutdown = false;
+
     public HttpDispatch(int id, ServerSocketChannel listenChannel, Map<String, String> config, Map<String, String> virtualHosts) throws Exception {
         this.id = id;
+        this.currentConnections = 0;
 
         this.selector = Selector.open();
         listenChannel.register(this.selector, SelectionKey.OP_ACCEPT);
@@ -24,8 +28,12 @@ class HttpDispatch implements Runnable {
         this.virtualHosts = virtualHosts;
     }
 
+    public static void requestShutdown() {
+        shutdown = true;
+    }
+
     public void run() {
-        while (true) {
+        while (!shutdown || this.currentConnections > 0) {
             // Block until at least one channel is ready
             try {
                 this.selector.select();
@@ -50,6 +58,7 @@ class HttpDispatch implements Runnable {
                             break;
                         }
                         clientChannel.configureBlocking(false);
+                        this.currentConnections += 1;
 
                         // Register client channel with selector
                         SelectionKey clientKey = clientChannel.register(this.selector, SelectionKey.OP_READ);
@@ -57,6 +66,13 @@ class HttpDispatch implements Runnable {
                         // Attach channel state
                         RequestState state = new RequestState();
                         clientKey.attach(state);
+
+                        // If max connections reached, send 503 (we don't want to be hovering at the limit, slightly below)
+                        if (this.currentConnections > Utils.MaxConnectionsPerThread) {
+                            System.out.println("[DEBUG] Max connections reached");
+                            state.response = new HttpResponse(503, "Service Unavailable");
+                            clientKey.interestOps(SelectionKey.OP_WRITE);
+                        }
 
                     } else if ((key.readyOps() & SelectionKey.OP_READ) != 0) {
                         SocketChannel clientChannel = (SocketChannel) key.channel();
@@ -95,7 +111,7 @@ class HttpDispatch implements Runnable {
                                 state.in.flip();
                                 state.response = handleRequest(clientChannel.socket(), request);
                             } catch (Exception e) {
-                                System.out.println("[DEBUG] Failed to process request: " + e.getMessage());
+                                System.out.println("[DEBUG] Failed to handle request: " + e.getMessage());
                                 state.response = new HttpResponse(500, "Internal Server Error");
                             }
 
@@ -110,8 +126,9 @@ class HttpDispatch implements Runnable {
                         if (state.response.outputBuffer.hasRemaining()) {
                             clientChannel.write(state.response.outputBuffer);
                         } else {
-                            if (state.response.statusCode == 408 || !state.request.keepAlive) {
+                            if (state.response.statusCode == 408 || state.request == null || !state.request.keepAlive) {
                                 clientChannel.close();
+                                this.currentConnections -= 1;
                             }
                         }
                     }
@@ -120,6 +137,7 @@ class HttpDispatch implements Runnable {
                     key.cancel();
                     try {
                         key.channel().close();
+                        this.currentConnections -= 1;
                     } catch (IOException cex) {
                         System.out.println("[ERROR] Failed to close channel: " + cex.getMessage());
                     }
@@ -131,6 +149,12 @@ class HttpDispatch implements Runnable {
     private HttpResponse handleRequest(Socket connectionSocket, HttpRequest request) throws Exception {
         int statusCode;
         String statusMessage;
+
+        // Check heartbeat request
+        if (request.path.equals("/heartbeat")) {
+            System.out.println("[DEBUG] Heartbeat request: " + this.currentConnections + ", " + Utils.MaxConnectionsPerThread);
+            return this.currentConnections < Utils.MaxConnectionsPerThread ? new HttpResponse(200, "OK") : new HttpResponse(503, "Service Unavailable");
+        }
 
         // Check virtual host is valid
         String virtualHostPath = this.virtualHosts.get(request.headers.get("Host"));

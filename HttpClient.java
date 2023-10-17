@@ -39,16 +39,20 @@ public class HttpClient {
         Thread.sleep(1000);
         
         // Send request
-        DataOutputStream out = new DataOutputStream(socket.getOutputStream());
-        out.writeBytes("GET " + url + " HTTP/1.0\r\n");
-        out.writeBytes("Host: cicada.cs.yale.edu\r\n");
-        out.writeBytes("Accept: text/plain, text/html\r\n");
-        out.writeBytes("User-Agent: iPhone/1.0\r\n");
-        // out.writeBytes("If-Modified-Since: " + Utils.getFormattedDate(new Date()) + "\r\n");
-        out.writeBytes("Connection: close\r\n");
-        out.writeBytes("Authorization: Basic " + Base64.getEncoder().encodeToString("username:password".getBytes()) + "\r\n");
-        out.writeBytes("\r\n");
-
+        try {
+            DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+            out.writeBytes("GET " + url + " HTTP/1.0\r\n");
+            out.writeBytes("Host: cicada.cs.yale.edu\r\n");
+            out.writeBytes("Accept: text/plain, text/html\r\n");
+            out.writeBytes("User-Agent: iPhone/1.0\r\n");
+            // out.writeBytes("If-Modified-Since: " + Utils.getFormattedDate(new Date()) + "\r\n");
+            out.writeBytes("Connection: close\r\n");
+            out.writeBytes("Authorization: Basic " + Base64.getEncoder().encodeToString("username:password".getBytes()) + "\r\n");
+            out.writeBytes("\r\n");
+        } catch (Exception e) {
+            System.out.println("Can't write: " + e.getMessage());
+        }
+        
         // Get response
         BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
         String line;

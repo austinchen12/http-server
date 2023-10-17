@@ -7,6 +7,7 @@ import java.text.SimpleDateFormat;
 import java.util.Locale;
 
 class Utils {
+    public static int MaxConnectionsPerThread = 2;
     public static String ServerName = "Austin's Really Cool HTTP Server";
     public static int TimeoutLength = 3000;
 

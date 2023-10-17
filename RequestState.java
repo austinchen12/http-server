@@ -25,10 +25,11 @@ public class RequestState {
     }
 
     public boolean endsInDoubleCRLF() {
-        return in.get(in.position() - 4) == '\r' &&
-               in.get(in.position() - 3) == '\n' &&
-               in.get(in.position() - 2) == '\r' &&
-               in.get(in.position() - 1) == '\n';
+        return in.position() >= 4 && 
+                in.get(in.position() - 4) == '\r' &&
+                in.get(in.position() - 3) == '\n' &&
+                in.get(in.position() - 2) == '\r' &&
+                in.get(in.position() - 1) == '\n';
     }
 
     public int getDoubleCRLFCount() {

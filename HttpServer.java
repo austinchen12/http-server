@@ -56,5 +56,18 @@ public class HttpServer {
             System.out.println("[ERROR] Could not start worker threads: " + e.getMessage());
             return;
         }
+
+        System.out.println("[DEBUG] Worker threads started. Enter shutdown command to finish existing requests and stop the server.");
+        
+        // Monitor thread for shutdown command
+        Scanner scanner = new Scanner(System.in);
+        while (true) {
+            String input = scanner.nextLine();
+            if (input.equals("shutdown")) {
+                System.out.println("[DEBUG] Shutting down server...");
+                HttpDispatch.requestShutdown();
+                break;
+            }
+        }
     }
 }
