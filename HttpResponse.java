@@ -48,7 +48,7 @@ public class HttpResponse {
     }
 
     private ByteBuffer toByteBuffer() {
-        ByteBuffer buffer = ByteBuffer.allocate(1024);
+        ByteBuffer buffer = ByteBuffer.allocate(1024 * 16);
 
         // Add headers in string builder
         StringBuilder sb = new StringBuilder();

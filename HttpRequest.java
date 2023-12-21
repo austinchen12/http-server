@@ -21,7 +21,7 @@ public class HttpRequest {
     public String[] credentials;
     public Map<String, String> queryParams = new HashMap<String, String>();
 
-    public static List<String> PossibleAcceptTypes = Arrays.asList("text/html", "text/plain", "application/json", "image/jpeg", "image/png", "image/gif", "application/pdf", "application/zip", "application/gzip", "application/x-tar", "application/x-bzip2", "application/x-rar-compressed", "application/x-7z-compressed", "audio/mpeg", "audio/ogg", "audio/wav", "audio/webm", "video/mp4", "video/ogg", "video/webm", "application/octet-stream");
+    public static List<String> PossibleAcceptTypes = Arrays.asList("text/html", "text/plain", "application/json", "image/jpeg", "image/png", "image/gif", "application/pdf", "application/zip", "application/gzip", "application/x-tar", "application/x-bzip2", "application/x-rar-compressed", "application/x-7z-compressed", "audio/mpeg", "audio/ogg", "audio/wav", "audio/webm", "video/mp4", "video/ogg", "video/webm", "application/octet-stream", "*/*");
 
     public HttpRequest(ByteBuffer in) throws Exception {
         String request = new String(in.array());
@@ -46,17 +46,11 @@ public class HttpRequest {
             headers.put(headerParts[0], headerParts[1]);
         }
 
-        // If Content-Length is present, read body
-        if (headers.containsKey("Content-Length")) {
-            int contentLength = Integer.parseInt(headers.get("Content-Length"));
-            byte[] bytes = new byte[contentLength];
-            for (int i = 0; i < contentLength; i++) {
-                bytes[i] = (byte) sections[1].charAt(i);
-            }
-            body = new String(bytes);
-        }
-
         processHeaders();
+    }
+
+    public void parseBody(ByteBuffer body) {
+        this.body = new String(body.array());
     }
 
     private String extractQueryParams(String line) {

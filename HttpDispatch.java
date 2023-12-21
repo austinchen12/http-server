@@ -91,28 +91,15 @@ class HttpDispatch implements Runnable {
                         int bytesRead = clientChannel.read(bytes);
                         state.appendInBytes(bytes, bytesRead);
 
-        
-                        // State.endsInDoubleCRLF is true if the request ends in \r\n\r\n, which should happen at most twice.
-                        // Might happen twice if its a POST request and buffer happens to end right before the body starts.
-                        // But not necessarily, so I need to process as if the body is included, and just ignore if we
-                        // didn't catch double CRLF in a POST request.
-                        if (state.endsInDoubleCRLF()) {
+                        if (state.doneReading) {
                             try {
-                                HttpRequest request = new HttpRequest(state.in);
-                                int numOfDoubleCRLF = state.getDoubleCRLFCount();
-
-                                if (request.method == HttpMethod.POST && numOfDoubleCRLF == 1) {
-                                    continue;
-                                }
-
-                                state.request = request;
-
                                 // Prepare input buffer to read and handle request
                                 state.in.flip();
-                                state.response = handleRequest(clientChannel.socket(), request);
+                                state.request.parseBody(state.body);
+                                state.response = handleRequest(clientChannel.socket(), state.request);
                             } catch (Exception e) {
                                 System.out.println("[DEBUG] Failed to handle request: " + e.getMessage());
-                                state.response = new HttpResponse(500, "Internal Server Error");
+                                state.response = new HttpResponse(400, "Bad request");
                             }
 
                             // Prepare output buffer to read and switch to write
@@ -132,7 +119,7 @@ class HttpDispatch implements Runnable {
                             }
                         }
                     }
-                } catch (IOException ex) {
+                } catch (Exception ex) {
                     System.out.println("[ERROR] Failed to process request: " + ex.getMessage());
                     key.cancel();
                     try {
@@ -151,7 +138,7 @@ class HttpDispatch implements Runnable {
         String statusMessage;
 
         // Check heartbeat request
-        if (request.path.equals("/heartbeat")) {
+        if (request.path.equals("/load")) {
             System.out.println("[DEBUG] Heartbeat request: " + this.currentConnections + ", " + Utils.MaxConnectionsPerThread);
             return this.currentConnections < Utils.MaxConnectionsPerThread ? new HttpResponse(200, "OK") : new HttpResponse(503, "Service Unavailable");
         }
@@ -159,8 +146,7 @@ class HttpDispatch implements Runnable {
         // Check virtual host is valid
         String virtualHostPath = this.virtualHosts.get(request.headers.get("Host"));
         if (virtualHostPath == null) {
-            System.out.println("[DEBUG] No virtual host found for " + request.headers.get("Host"));
-            return new HttpResponse(400, "Malformed Request");
+            virtualHostPath = this.virtualHosts.get("__DEFAULT__");
         }
 
         // Make sure no relative path
@@ -201,7 +187,7 @@ class HttpDispatch implements Runnable {
         }
 
         // Check if content type is accepted
-        if (!request.acceptTypes.contains(contentType)) {
+        if (request.acceptTypes != null && !request.acceptTypes.contains("*/*") && !request.acceptTypes.contains(contentType)) {
             System.out.println("[DEBUG] Content type not accepted by user: " + path + ", " + contentType);
             return new HttpResponse(406, "Not Acceptable");
         }
@@ -272,8 +258,7 @@ class HttpDispatch implements Runnable {
                 }
 
                 contentLength = contentBytes.length;
-
-                return new HttpResponse(201, "Created");
+                return new HttpResponse(201, "Created", lastModifiedDate, contentType, contentBytes);
             case HttpMethod.DELETE:
                 if (!file.canExecute()) {
                     System.out.println("[DEBUG] File not executable: " + path);

@@ -5,6 +5,8 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.text.SimpleDateFormat;
 import java.util.Locale;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 class Utils {
     public static int MaxConnectionsPerThread = 2;
@@ -22,20 +24,32 @@ class Utils {
         ApacheConfigParser parser = new ApacheConfigParser();
         ConfigNode root = parser.parse(inputStream);
 
-        // Create stack
-        Stack<ConfigNode> stack = new Stack<ConfigNode>();
+        // Create queue
+        Stack<ConfigNode> queue = new Stack<ConfigNode>();
         for (ConfigNode child : root.getChildren()) {
-            stack.push(child);
+            queue.push(child);
         }
 
         // Populate config
-        while (!stack.empty()) {
-            ConfigNode node = stack.pop();
+        while (!queue.empty()) {
+            ConfigNode node = queue.remove(0);
 
             if (node.getName().equals("VirtualHost")) {
                 List<ConfigNode> children = node.getChildren();
                 String serverName = children.get(0).getName().equals("ServerName") ? children.get(0).getContent() : children.get(1).getContent();
                 String documentRoot = children.get(0).getName().equals("ServerName") ? children.get(1).getContent() : children.get(0).getContent();
+                
+                // Convert path to absolutePath and check if its inside CWD
+                Path absolutePath = Paths.get(documentRoot).toAbsolutePath().normalize();
+                if (!absolutePath.startsWith(Paths.get(System.getProperty("user.dir")))) {
+                    throw new Exception("DocumentRoot must be inside current directory");
+                }
+
+                // Remove CWD part of path
+                documentRoot = absolutePath.toString().substring(System.getProperty("user.dir").length());
+                if (virtualHosts.size() == 0) {
+                    virtualHosts.put("__DEFAULT__", documentRoot);
+                }
                 virtualHosts.put(serverName, documentRoot);
                 continue;
             } else {
