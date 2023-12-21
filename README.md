@@ -24,6 +24,5 @@ SKIPPING
 - origin-form, absolute-form, authority-form, asterisk-form
 - qvalues + wildcard
 - realistic file types: html file can also be plain text but we dont care
-- close + keep alive
 - general validation of header values
 - transfer encoding
